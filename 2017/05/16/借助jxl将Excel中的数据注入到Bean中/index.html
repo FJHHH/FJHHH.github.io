@@ -1,0 +1,181 @@
+<!DOCTYPE html><html lang="zh-cn"><head><meta name="generator" content="Hexo 3.8.0"><meta charset="utf-8"><title>借助jxl将Excel中的数据注入到Bean中 | 渣博客</title><meta http-equiv="X-UA-Compatible" content="IE=Edge,chrome=1"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><meta name="format-detection" content="telephone=no"><meta name="author" content="[object Object]"><meta name="designer" content="minfive"><meta name="keywords" content="null"><meta name="description" content="一个学渣的渣博客"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black"><meta name="format-detection" content="telephone=yes"><meta name="mobile-web-app-capable" content="yes"><meta name="robots" content="all"><link rel="canonical" href="http://blog.fangjunhao.com/2017/05/16/借助jxl将Excel中的数据注入到Bean中/index.html"><link rel="icon" type="image/png" href="undefined" sizes="32x32"><link rel="stylesheet" href="/scss/base/index.css"><link rel="alternate" href="/atom.xml" title="渣博客"><script async src="https://www.googletagmanager.com/gtag/js?id=UA-128550327-1"></script><script>function gtag(){dataLayer.push(arguments)}window.dataLayer=window.dataLayer||[],gtag("js",new Date),gtag("config","UA-128550327-1")</script><link rel="stylesheet" href="/scss/views/page/post.css"></head><body ontouchstart=""><div id="page-loading" class="page page-loading" style="background-image:url(undefined)"></div><div id="page" class="page js-hidden"><header class="page__small-header page__header--small"><nav class="page__navbar"><div class="page__container navbar-container"><a class="page__logo" href="/" title="渣博客" alt="渣博客"><img src="/img/logo.png" alt="渣博客"></a><nav class="page__nav"><ul class="nav__list clearfix"><li class="nav__item"><a href="/" alt="首页" title="首页">首页</a></li><li class="nav__item"><a href="/archives" alt="归档" title="归档">归档</a></li><li class="nav__item"><a href="/about" alt="关于" title="关于">关于</a></li></ul></nav><button class="page__menu-btn" type="button"><i class="iconfont icon-menu"></i></button></div></nav></header><main class="page__container page__main"><div class="page__content"><article class="page__post"><div class="post__cover"><img src="/img/header.jpg" alt="借助jxl将Excel中的数据注入到Bean中"></div><header class="post__info"><h1 class="post__title">借助jxl将Excel中的数据注入到Bean中</h1><div class="post__mark"><div class="mark__block"><i class="mark__icon iconfont icon-write"></i><ul class="mark__list clearfix"><li class="mark__item"><a href="/">undefined</a></li></ul></div><div class="mark__block"><i class="mark__icon iconfont icon-time"></i><ul class="mark__list clearfix"><li class="mark__item"><span>2017-05-16</span></li></ul></div><div class="mark__block"><i class="mark__icon iconfont icon-tab"></i><ul class="mark__list clearfix"><li class="mark__item"><a href="/tags/Java/">Java</a></li><li class="mark__item"><a href="/tags/常用的代码/">常用的代码</a></li></ul></div></div></header><div class="post__content"><h2 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h2><p>使用了Hibernate的项目中需要导入多张表的数据，但是我又不想写多次取出Excle数据放到Bean里的代码，于是写了个ExcleUtils来帮助我做这件事。</p><h2 id="基本思路"><a href="#基本思路" class="headerlink" title="基本思路"></a>基本思路</h2><p>技术上，首先肯定是要借助反射的，然后选择了jxl来操作Excle。</p><p>需要的参数上，Excle文件不能少；好像没有什么方法能够在Excel隐藏地放入对应属性名的信息（就是属性名字不会在Excle中显示出来，如果有方法能够做到，请给我留言，多谢！），于是我会需要按照Excle顺序的属性名称数组；然后我需要在Sheet页的序号以及数据从第几行开始；对于Date类型，可能需要SimpleDateFormat对象来进行转换，如果没有就使用默认的。因此这个方法应该是这样的（并且有一个重载版本）：</p><pre><code>public static &amp;lt;T&amp;gt; List&amp;lt;T&amp;gt; getDataList(File excelFile, int sheetindex,
+            int start, String[] props, Class&amp;lt;T&amp;gt; clazz) throws Exception {
+    return getDataList(excelFile, sheetindex, start, props, clazz, null);
+}
+
+public static &amp;lt;T&amp;gt; List&amp;lt;T&amp;gt; getDataList(File excelFile, int sheetindex,
+            int start, String[] props, Class&amp;lt;T&amp;gt; clazz, SimpleDateFormat sdf) {
+    //TODO
+}
+`&lt;/pre&gt;
+
+## 实现
+
+本来想把代码拆开说说自己的思路，想了想还是整块代码贴上然后写注释把（只贴相关部分的），其实都蛮简单的。
+
+&lt;pre class=&quot;line-numbers prism-highlight&quot; data-start=&quot;1&quot;&gt;`private static final Map&amp;lt;Class&amp;lt;?&amp;gt;, Class&amp;lt;?&amp;gt;&amp;gt; pwMap = new HashMap&amp;lt;Class&amp;lt;?&amp;gt;, Class&amp;lt;?&amp;gt;&amp;gt;();
+
+    static {
+        pwMap.put(byte.class, Byte.class);
+        pwMap.put(short.class, Short.class);
+        pwMap.put(int.class, Integer.class);
+        pwMap.put(long.class, Long.class);
+        pwMap.put(float.class, Float.class);
+        pwMap.put(double.class, Double.class);
+        pwMap.put(boolean.class, Boolean.class);
+        pwMap.put(char.class, Character.class);
+    }
+
+    private ExcelUtils() {
+    }
+
+    /**
+     * &amp;lt;p&amp;gt;
+     * 从Excel中获取对象列
+     * &amp;lt;/p&amp;gt;
+     * 
+     * @param excelFile
+     *            文件
+     * @param sheetindex
+     *            第几个sheet
+     * @param props
+     *            属性名（按顺序） （如果有非基本类型需要实现valueOf方法）
+     * @param clazz
+     *            类型
+     * @return
+     * @throws Exception
+     *      String[], Class, SimpleDateFormat)
+     */
+    public static &amp;lt;T&amp;gt; List&amp;lt;T&amp;gt; getDataList(File excelFile, int sheetindex,
+            int startRow, int startCol, String[] props, Class&amp;lt;T&amp;gt; clazz)
+            throws Exception {
+        return getDataList(excelFile, sheetindex, startRow, startCol, props,
+                clazz, null);
+    }
+
+    /**
+     * 
+     * @param excelFile
+     *            Excel文件
+     * @param sheetindex
+     * @param start
+     * @param props
+     * @param clazz
+     * @param sdf
+     * @return
+     * @throws Exception
+     */
+    public static &amp;lt;T&amp;gt; List&amp;lt;T&amp;gt; getDataList(File excelFile, int sheetindex,
+            int startRow, int startCol, String[] props, Class&amp;lt;T&amp;gt; clazz,
+            SimpleDateFormat sdf) throws Exception {
+        Workbook excel = null;
+        try {
+            excel = Workbook.getWorkbook(excelFile);
+            Sheet sheet = excel.getSheet(sheetindex);
+            int n = sheet.getRows();
+            List&amp;lt;T&amp;gt; result = new ArrayList&amp;lt;T&amp;gt;(n);
+            for (int i = startRow; i &amp;lt; n; i++) {
+                Cell[] row = sheet.getRow(i);
+                result.add(getRowData(props, row, clazz, sdf, startCol));
+            }
+            return result;
+        } catch (BiffException | IOException e) {
+            throw new Exception(&quot;读取Excel文件出错！&quot;);
+        } finally {
+            excel.close();
+        }
+    }
+
+    /**
+     * &amp;lt;p&amp;gt;
+     * 获取其中一行的数据注入到对象中
+     * &amp;lt;/p&amp;gt;
+     * 
+     * @param props
+     * @param row
+     * @param clazz
+     * @return
+     * @throws Exception
+     */
+    public static &amp;lt;T&amp;gt; T getRowData(String[] props, Cell[] row, Class&amp;lt;T&amp;gt; clazz,
+            int startCol) throws Exception {
+        return getRowData(props, row, clazz, null, startCol);
+    }
+
+    /**
+     * 
+     * @param props
+     * @param row
+     * @param clazz
+     * @param sdf
+     * @return
+     * @throws Exception
+     */
+    public static &amp;lt;T&amp;gt; T getRowData(String[] props, Cell[] row, Class&amp;lt;T&amp;gt; clazz,
+            SimpleDateFormat sdf, int startCol) throws Exception {
+        // 属性首字母大写
+        for (int i = 0; i &amp;lt; props.length; i++) {
+            if (props[i] == null)
+                continue;
+            StringBuilder sb = new StringBuilder(props[i]);
+            sb.setCharAt(0, Character.toUpperCase(sb.charAt(0)));
+            props[i] = sb.toString();
+        }
+        // 实例化一个对象
+        T result = clazz.newInstance();
+        for (int i = 0; i &amp;lt; props.length; i++) {
+            String propName = props[i];
+            if (propName == null) {
+                continue;
+            }
+            Class&amp;lt;?&amp;gt; type = getPropType(clazz, propName);
+            // 把getter的返回类型作为参数类型获取setter
+            Method setter = clazz.getMethod(&quot;set&quot; + propName, type);
+            String contents = row[i + startCol].getContents();
+
+            if (contents != null) {
+                Object val = string2Type(contents, type, sdf);
+                // 执行setter
+                setter.invoke(result, val);
+            }
+        }
+        return result;
+    }
+
+    private static final SimpleDateFormat DEFALUT_SIMPLEDATEF = new SimpleDateFormat(
+            &quot;yyyy-MM-dd&quot;);
+
+    @SuppressWarnings(&quot;unchecked&quot;)
+    private static &amp;lt;T&amp;gt; T string2Type(String val, Class&amp;lt;T&amp;gt; clazz,
+            SimpleDateFormat sdf) throws Exception {
+        Method valueOf = null;
+        // 对Date和String特殊处理
+        if (String.class == clazz) {
+            return (T) val;
+        }
+        if (Date.class == clazz) {
+            return (T) (sdf != null ? sdf.parse(val) : DEFALUT_SIMPLEDATEF
+                    .parse(val));
+        }
+        if (char.class == clazz || Character.class == clazz) {
+            Character c = val.toCharArray().length &amp;gt; 0 ? val.toCharArray()[0]
+                    : (Character.class == clazz ? null : (char) 0);
+            return (T) c;
+        }
+        // 对基本类型做处理
+        Class&amp;lt;?&amp;gt; finalclazz = clazz.isPrimitive() ? pwMap.get(clazz) : clazz;
+        try {
+            valueOf = finalclazz.getMethod(&quot;valueOf&quot;, String.class);
+        } catch (NoSuchMethodException e) {
+            throw new Exception(&quot;成员类型需要有T valueOf(String)静态方法&quot;);
+        }
+        return (T) valueOf.invoke(null, val);
+    }
+
+    private static Class&amp;lt;?&amp;gt; getPropType(Class&amp;lt;?&amp;gt; clazz, String propName)
+            throws NoSuchMethodException, SecurityException {
+        Method getter = clazz.getMethod(&quot;get&quot; + propName);
+        Class&amp;lt;?&amp;gt; type = getter.getReturnType();
+        return type;
+    }
+</code></pre><div class="post-announce">感谢您的阅读，本文由 <a href="http://blog.fangjunhao.com">渣博客</a> 版权所有。如若转载，请注明出处：渣博客（<a href="http://blog.fangjunhao.com/2017/05/16/借助jxl将Excel中的数据注入到Bean中/">http://blog.fangjunhao.com/2017/05/16/借助jxl将Excel中的数据注入到Bean中/</a>）</div><div class="post__prevs"><div class="post__prev"><a href="/2017/05/11/买卖股票的最佳时机-II/" title="买卖股票的最佳时机 II"><i class="iconfont icon-prev"></i>买卖股票的最佳时机 II</a></div><div class="post__prev post__prev--right"><a href="/2018/04/24/spring-websocket集群问题的简单记录/" title="spring websocket集群问题的简单记录">spring websocket集群问题的简单记录<i class="iconfont icon-next"></i></a></div></div></div></article></div><aside class="page__sidebar"><form id="page-search-from" class="page__search-from" action="/search/"><label class="search-form__item"><input class="input" type="text" name="search" placeholder="Search..."> <i class="iconfont icon-search"></i></label></form><div class="sidebar__block"><h3 class="block__title">简介</h3><p class="block__text">一个学渣的渣博客</p></div><div class="sidebar__block"><h3 class="block__title">文章分类</h3></div><div class="sidebar__block"><h3 class="block__title">最新文章</h3><ul class="block-list latest-post-list"><li class="latest-post-item"><a href="/2018/06/06/Jvm内存区域和GC/" title="Jvm内存区域和GC"><div class="item__cover"><img src="/img/header.jpg" alt="Jvm内存区域和GC"></div><div class="item__info"><h3 class="item__title">Jvm内存区域和GC</h3><span class="item__text">2018-06-06</span></div></a></li><li class="latest-post-item"><a href="/2018/05/26/装饰模式和Java-IO/" title="装饰模式和Java IO"><div class="item__cover"><img src="/img/header.jpg" alt="装饰模式和Java IO"></div><div class="item__info"><h3 class="item__title">装饰模式和Java IO</h3><span class="item__text">2018-05-26</span></div></a></li><li class="latest-post-item"><a href="/2018/05/25/使用Retrofit2调用HTTP-API/" title="使用Retrofit2调用HTTP API"><div class="item__cover"><img src="/img/header.jpg" alt="使用Retrofit2调用HTTP API"></div><div class="item__info"><h3 class="item__title">使用Retrofit2调用HTTP API</h3><span class="item__text">2018-05-25</span></div></a></li><li class="latest-post-item"><a href="/2018/05/25/WebSphere部署Spring-Boot/" title="WebSphere部署Spring Boot"><div class="item__cover"><img src="/img/header.jpg" alt="WebSphere部署Spring Boot"></div><div class="item__info"><h3 class="item__title">WebSphere部署Spring Boot</h3><span class="item__text">2018-05-25</span></div></a></li></ul></div><div class="sidebar__block"><h3 class="block__title">文章标签</h3><ul class="block-list tag-list clearfix"><li class="tag-item"><a class="tag-link" href="/tags/GC/">GC</a></li><li class="tag-item"><a class="tag-link" href="/tags/Hibernate/">Hibernate</a></li><li class="tag-item"><a class="tag-link" href="/tags/JVM/">JVM</a></li><li class="tag-item"><a class="tag-link" href="/tags/Java/">Java</a></li><li class="tag-item"><a class="tag-link" href="/tags/JavaScript/">JavaScript</a></li><li class="tag-item"><a class="tag-link" href="/tags/LintCode/">LintCode</a></li><li class="tag-item"><a class="tag-link" href="/tags/websocket/">websocket</a></li><li class="tag-item"><a class="tag-link" href="/tags/买卖股票的最佳时机/">买卖股票的最佳时机</a></li><li class="tag-item"><a class="tag-link" href="/tags/常用的代码/">常用的代码</a></li></ul></div></aside></main><footer class="page__footer"><section class="footer__top"><div class="page__container footer__container"><div class="footer-top__item footer-top__item--2"><h3 class="item__title">关于</h3><div class="item__content"><p class="item__text">本站是基于 Hexo 搭建的静态资源博客，欢迎点击右下角订阅 rss。</p><ul class="footer__contact-info"><li class="contact-info__item"><i class="iconfont icon-address"></i> <span>Hangzhou, Zhejiang Province, China</span></li><li class="contact-info__item"><i class="iconfont icon-email2"></i> <span>fangjunhao1994@gmail.com</span></li></ul></div></div></div></section><section class="footer__bottom"><div class="page__container footer__container"><p class="footer__copyright">© <a href="https://github.com/Mrminfive/hexo-theme-skapp" target="_blank">Skapp</a> 2017 powered by <a href="http://hexo.io/" target="_blank">Hexo</a>, made by <a href="https://github.com/Mrminfive" target="_blank">minfive</a>.</p><ul class="footer__social-network clearfix"></ul></div></section></footer><div id="back-top" class="back-top back-top--hidden js-hidden"><i class="iconfont icon-top"></i></div></div><script src="/js/common.js"></script><script src="/js/page/post.js"></script><script async src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script></body></html>
